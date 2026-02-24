@@ -1,0 +1,13 @@
+{{- if .Values.grafanaDashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.grafanaDashboard.configMapName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    grafana_dashboard: "1"
+data:
+  binbots-k8s-dashboard.json: |
+{{ .Files.Get "deploy/grafana-dashboard-binbots.json" | indent 4 }}
+{{- end }}
+

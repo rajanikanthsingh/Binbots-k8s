@@ -1,0 +1,36 @@
+namespace: monitoring
+
+image:
+  exporter:
+    repository: your-registry/k8s-ai-exporter
+    tag: latest
+    pullPolicy: IfNotPresent
+  agent:
+    repository: your-registry/k8s-ai-agent
+    tag: latest
+    pullPolicy: IfNotPresent
+
+exporter:
+  scrapeInterval: 30s
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+agent:
+  schedule: "*/10 * * * *"
+  lookbackMinutes: 120
+  forecastMinutes: 30
+
+serviceMonitor:
+  enabled: true
+  releaseLabel: prometheus-stack
+
+grafanaDashboard:
+  enabled: true
+  configMapName: binbots-k8s-dashboard
+  folder: ""
+

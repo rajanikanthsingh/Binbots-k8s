@@ -170,8 +170,40 @@ That matches the default service name from **kube-prometheus-stack**. If your Pr
 - **Local (kind, minikube, k3d, k3s)**: Same manifests; ensure kube-prometheus-stack and this stack share the same namespace or adjust `namespaceSelector` / Prometheus URL.
 - **EKS / AKS / GKE**: Exporter uses API server proxy only (no direct kubelet node port); no `hostNetwork` or privileged pods. Same YAMLs and ServiceMonitor.
 
+### Cloud notes (EKS / AKS / GKE)
+
+- **API server proxy only**: The Go exporter talks to kubelet/cAdvisor via the Kubernetes API server (`/api/v1/nodes/<node>/proxy/...`), so you do not need to open `10250` on node IPs or run privileged/hostNetwork pods.
+- **kube-prometheus-stack**: Install it in the same namespace (`monitoring` by default) and keep the `ServiceMonitor` label `release: prometheus-stack` (or set it to your actual Helm release name).
+- **IAM / identity**:
+  - EKS: you can run with standard in-cluster ServiceAccount tokens; for locked-down clusters, map the `k8s-ai-exporter` ServiceAccount to an IRSA role if you later add cloud APIs.
+  - GKE / AKS: workload identity is only needed if the exporter or AI agent calls cloud provider APIs; Binbots-k8s itself only talks to the Kubernetes API and Prometheus.
+- **Namespaces**: The manifests and Helm chart default to `monitoring`. You can change that, but ensure:
+  - kube-prometheus-stack is configured to watch that namespace (via `serviceMonitorSelector` / `namespaceSelector`),
+  - the CronJob’s `PROMETHEUS_URL` points at the correct Prometheus service FQDN in that namespace.
+
 ## Optional
 
-- **Grafana**: Add a dashboard for `k8s_node_cpu_usage_cores`, `k8s_node_memory_usage_bytes`, `k8s_node_active_pods`.
+- **Grafana**: Use the provided dashboard in `deploy/grafana-dashboard-binbots.json` or the Helm chart’s dashboard ConfigMap to visualize `k8s_node_cpu_usage_cores`, `k8s_node_memory_usage_bytes`, `k8s_node_active_pods`.
 - **Slack / webhook**: Extend `ai_agent.py` to POST recommendations to a webhook.
-- **Different schedule**: Change `schedule` in `deploy/cronjob-ai-agent.yaml` (e.g. `"*/5 * * * *"` for every 5 minutes).
+- **Different schedule**: Change `schedule` in `deploy/cronjob-ai-agent.yaml` or `.Values.agent.schedule` in the Helm chart (e.g. `"*/5 * * * *"` for every 5 minutes).
+
+## Helm chart
+
+There is a simple Helm chart under `helm/` that deploys:
+
+- `k8s-ai-exporter` DaemonSet, Service, ServiceAccount, ClusterRole, ClusterRoleBinding
+- `k8s-ai-agent` CronJob
+- Optional `ServiceMonitor` for kube-prometheus-stack
+- Optional Grafana dashboard ConfigMap (uses `deploy/grafana-dashboard-binbots.json`)
+
+Basic usage:
+
+```bash
+cd helm
+helm install binbots-k8s . \
+  --set image.exporter.repository=your-registry/k8s-ai-exporter \
+  --set image.agent.repository=your-registry/k8s-ai-agent
+```
+
+You can override `namespace`, Prometheus release label, and dashboard options in `values.yaml`.
+

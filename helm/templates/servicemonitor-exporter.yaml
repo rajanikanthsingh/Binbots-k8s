@@ -1,0 +1,21 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: k8s-ai-exporter
+  namespace: {{ .Values.namespace }}
+  labels:
+    release: {{ .Values.serviceMonitor.releaseLabel }}
+spec:
+  selector:
+    matchLabels:
+      app: k8s-ai-exporter
+  namespaceSelector:
+    matchNames: ["{{ .Values.namespace }}"]
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+{{- end }}
+

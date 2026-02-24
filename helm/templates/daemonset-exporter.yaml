@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: k8s-ai-exporter
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: k8s-ai-exporter
+spec:
+  selector:
+    matchLabels:
+      app: k8s-ai-exporter
+  template:
+    metadata:
+      labels:
+        app: k8s-ai-exporter
+    spec:
+      serviceAccountName: k8s-ai-exporter
+      automountServiceAccountToken: true
+      tolerations:
+        - operator: "Exists"
+      containers:
+        - name: exporter
+          image: "{{ .Values.image.exporter.repository }}:{{ .Values.image.exporter.tag }}"
+          imagePullPolicy: {{ .Values.image.exporter.pullPolicy }}
+          args:
+            - --listen-address=:9100
+            - --scrape-interval={{ .Values.exporter.scrapeInterval }}
+            - --enable-kubelet=true
+            - --enable-cadvisor=true
+            - --exclude-phases=Succeeded,Failed
+          ports:
+            - name: http
+              containerPort: 9100
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+{{ toYaml .Values.exporter.resources.requests | indent 14 }}
+            limits:
+{{ toYaml .Values.exporter.resources.limits | indent 14 }}
+

@@ -1,0 +1,7 @@
+apiVersion: v2
+name: binbots-k8s
+description: Binbots-k8s - Kubernetes scraper (Go) and AI agent (Python) for node utilization
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+

@@ -1,0 +1,26 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: k8s-ai-agent
+  namespace: {{ .Values.namespace }}
+spec:
+  schedule: "{{ .Values.agent.schedule }}"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ai-agent
+              image: "{{ .Values.image.agent.repository }}:{{ .Values.image.agent.tag }}"
+              imagePullPolicy: {{ .Values.image.agent.pullPolicy }}
+              env:
+                - name: PROMETHEUS_URL
+                  value: "http://prometheus-kube-prometheus-prometheus.{{ .Values.namespace }}.svc:9090"
+                - name: LOOKBACK_MINUTES
+                  value: "{{ .Values.agent.lookbackMinutes }}"
+                - name: FORECAST_MINUTES
+                  value: "{{ .Values.agent.forecastMinutes }}"
+
