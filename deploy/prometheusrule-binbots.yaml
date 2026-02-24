@@ -1,0 +1,33 @@
+# PrometheusRule for Binbots-k8s: alerts when exporter or AI agent are down / not running.
+# Requires Prometheus Operator (kube-prometheus-stack). Label release must match your stack release name.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: binbots-k8s-alerts
+  namespace: monitoring
+  labels:
+    release: prometheus-stack
+spec:
+  groups:
+    - name: binbots-k8s
+      interval: 30s
+      rules:
+        # Exporter targets (from ServiceMonitor) are all down for 5m
+        - alert: BinbotsExporterDown
+          expr: max(up{job=~".*k8s-ai-exporter.*"}) == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Binbots k8s-ai-exporter has no healthy targets"
+            description: "All k8s-ai-exporter scrape targets have been down for more than 5 minutes. Check DaemonSet pods and ServiceMonitor."
+
+        # CronJob k8s-ai-agent has not had a successful run in 30m (requires kube-state-metrics)
+        - alert: BinbotsAgentNotRun
+          expr: (time() - kube_cronjob_status_last_successful_time{namespace="monitoring", cronjob="k8s-ai-agent"}) > 1800
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Binbots AI agent CronJob has not run successfully in 30+ minutes"
+            description: "k8s-ai-agent in namespace monitoring has not completed a successful run in over 30 minutes. Check CronJob and job logs."

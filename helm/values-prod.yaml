@@ -1,27 +1,28 @@
+# Production overrides: tighter schedule, higher resources, stricter alerts
+# Usage: helm upgrade --install binbots-k8s . -f values.yaml -f values-prod.yaml
 namespace: monitoring
 
 image:
   exporter:
     repository: your-registry/k8s-ai-exporter
-    tag: latest
+    # tag: set via --set image.exporter.tag=v0.2.0 (default from values.yaml otherwise)
     pullPolicy: IfNotPresent
   agent:
     repository: your-registry/k8s-ai-agent
-    tag: latest
     pullPolicy: IfNotPresent
 
 exporter:
-  scrapeInterval: 30s
+  scrapeInterval: 20s
   resources:
     requests:
-      cpu: 50m
-      memory: 64Mi
+      cpu: 100m
+      memory: 128Mi
     limits:
-      cpu: 500m
-      memory: 256Mi
+      cpu: 1000m
+      memory: 512Mi
 
 agent:
-  schedule: "*/10 * * * *"
+  schedule: "*/5 * * * *"   # every 5 min in prod
   lookbackMinutes: 120
   forecastMinutes: 30
 
@@ -34,10 +35,9 @@ prometheusRule:
   releaseLabel: prometheus-stack
   interval: 30s
   exporterDownFor: 5m
-  agentNotRunThresholdSeconds: 1800  # 30 min
+  agentNotRunThresholdSeconds: 900   # 15 min in prod
 
 grafanaDashboard:
   enabled: true
   configMapName: binbots-k8s-dashboard
-  folder: ""
-
+  folder: "Kubernetes"

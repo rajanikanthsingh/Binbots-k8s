@@ -1,0 +1,44 @@
+# Development / dev cluster overrides
+# Usage: helm install binbots-k8s . -f values-dev.yaml -f values.yaml (or --set overrides)
+namespace: monitoring
+
+image:
+  exporter:
+    repository: your-registry/k8s-ai-exporter
+    tag: dev
+    pullPolicy: Always
+  agent:
+    repository: your-registry/k8s-ai-agent
+    tag: dev
+    pullPolicy: Always
+
+exporter:
+  scrapeInterval: 30s
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+agent:
+  schedule: "*/15 * * * *"   # every 15 min in dev
+  lookbackMinutes: 60
+  forecastMinutes: 15
+
+serviceMonitor:
+  enabled: true
+  releaseLabel: prometheus-stack
+
+prometheusRule:
+  enabled: true
+  releaseLabel: prometheus-stack
+  interval: 30s
+  exporterDownFor: 10m      # longer before alert in dev
+  agentNotRunThresholdSeconds: 2700  # 45 min
+
+grafanaDashboard:
+  enabled: true
+  configMapName: binbots-k8s-dashboard
+  folder: "Dev"

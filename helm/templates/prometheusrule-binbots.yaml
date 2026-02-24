@@ -1,0 +1,31 @@
+{{- if .Values.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: binbots-k8s-alerts
+  namespace: {{ .Values.namespace }}
+  labels:
+    release: {{ .Values.prometheusRule.releaseLabel }}
+spec:
+  groups:
+    - name: binbots-k8s
+      interval: {{ .Values.prometheusRule.interval }}
+      rules:
+        - alert: BinbotsExporterDown
+          expr: max(up{job=~".*k8s-ai-exporter.*"}) == 0
+          for: {{ .Values.prometheusRule.exporterDownFor }}
+          labels:
+            severity: warning
+          annotations:
+            summary: "Binbots k8s-ai-exporter has no healthy targets"
+            description: "All k8s-ai-exporter scrape targets have been down for more than 5 minutes. Check DaemonSet pods and ServiceMonitor."
+
+        - alert: BinbotsAgentNotRun
+          expr: (time() - kube_cronjob_status_last_successful_time{namespace="{{ .Values.namespace }}", cronjob="k8s-ai-agent"}) > {{ .Values.prometheusRule.agentNotRunThresholdSeconds }}
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Binbots AI agent CronJob has not run successfully recently"
+            description: "k8s-ai-agent has not completed a successful run within the threshold. Check CronJob and job logs."
+{{- end }}

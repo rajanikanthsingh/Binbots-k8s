@@ -46,10 +46,12 @@ flowchart LR
 ├── go/                    # Go exporter (DaemonSet)
 │   ├── go.mod
 │   ├── main.go
+│   ├── metrics_test.go
 │   └── Dockerfile
 ├── python/                # AI agent (CronJob)
 │   ├── requirements.txt
 │   ├── ai_agent.py
+│   ├── test_ai_agent.py
 │   └── Dockerfile
 ├── deploy/                # Kubernetes manifests (separate YAMLs)
 │   ├── namespace.yaml
@@ -59,7 +61,17 @@ flowchart LR
 │   ├── daemonset-exporter.yaml
 │   ├── service-exporter.yaml
 │   ├── servicemonitor-exporter.yaml
-│   └── cronjob-ai-agent.yaml
+│   ├── prometheusrule-binbots.yaml
+│   ├── cronjob-ai-agent.yaml
+│   └── grafana-dashboard-binbots.json
+├── helm/                  # Helm chart (see "Helm chart" section)
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   ├── values-dev.yaml
+│   ├── values-prod.yaml
+│   ├── dashboards/
+│   └── templates/
+├── CHANGELOG.md
 └── README.md
 ```
 
@@ -112,6 +124,7 @@ kubectl apply -f deploy/clusterrolebinding.yaml
 kubectl apply -f deploy/daemonset-exporter.yaml
 kubectl apply -f deploy/service-exporter.yaml
 kubectl apply -f deploy/servicemonitor-exporter.yaml
+kubectl apply -f deploy/prometheusrule-binbots.yaml
 kubectl apply -f deploy/cronjob-ai-agent.yaml
 ```
 
@@ -181,9 +194,14 @@ That matches the default service name from **kube-prometheus-stack**. If your Pr
   - kube-prometheus-stack is configured to watch that namespace (via `serviceMonitorSelector` / `namespaceSelector`),
   - the CronJob’s `PROMETHEUS_URL` points at the correct Prometheus service FQDN in that namespace.
 
+## Testing
+
+- **Go:** From `go/` run `go test -v ./...` to run unit tests for metric parsing (`parsePrometheusValue`, `parseContainerMetrics`).
+- **Python:** From `python/` run `pip install -r requirements.txt` then `pytest test_ai_agent.py -v` to run tests for recommendation logic and forecast helpers.
+
 ## Optional
 
-- **Grafana**: Use the provided dashboard in `deploy/grafana-dashboard-binbots.json` or the Helm chart’s dashboard ConfigMap to visualize `k8s_node_cpu_usage_cores`, `k8s_node_memory_usage_bytes`, `k8s_node_active_pods`.
+- **Grafana**: The Helm chart creates a ConfigMap with label `grafana_dashboard: "1"` (and optional `grafana_dashboard_folder`) so kube-prometheus-stack’s Grafana sidecar can load it. If you deploy with raw YAML only, import `deploy/grafana-dashboard-binbots.json` in Grafana UI (Dashboards → Import → Upload JSON). The dashboard shows `k8s_node_cpu_usage_cores`, `k8s_node_memory_usage_bytes`, `k8s_node_active_pods`.
 - **Slack / webhook**: Extend `ai_agent.py` to POST recommendations to a webhook.
 - **Different schedule**: Change `schedule` in `deploy/cronjob-ai-agent.yaml` or `.Values.agent.schedule` in the Helm chart (e.g. `"*/5 * * * *"` for every 5 minutes).
 
@@ -194,7 +212,8 @@ There is a simple Helm chart under `helm/` that deploys:
 - `k8s-ai-exporter` DaemonSet, Service, ServiceAccount, ClusterRole, ClusterRoleBinding
 - `k8s-ai-agent` CronJob
 - Optional `ServiceMonitor` for kube-prometheus-stack
-- Optional Grafana dashboard ConfigMap (uses `deploy/grafana-dashboard-binbots.json`)
+- Optional Grafana dashboard ConfigMap (embedded from `helm/dashboards/`)
+- Optional PrometheusRule (exporter down, agent not run)
 
 Basic usage:
 
@@ -206,4 +225,14 @@ helm install binbots-k8s . \
 ```
 
 You can override `namespace`, Prometheus release label, and dashboard options in `values.yaml`.
+
+**Multi-environment:** Use `values-dev.yaml` or `values-prod.yaml` for environment-specific overrides (schedule, resources, alert thresholds, image tags):
+
+```bash
+# Dev
+helm upgrade --install binbots-k8s . -f values.yaml -f values-dev.yaml --set image.exporter.repository=myreg/k8s-ai-exporter --set image.agent.repository=myreg/k8s-ai-agent
+
+# Prod (pin image tags)
+helm upgrade --install binbots-k8s . -f values.yaml -f values-prod.yaml --set image.exporter.repository=myreg/k8s-ai-exporter --set image.exporter.tag=v0.2.0 --set image.agent.repository=myreg/k8s-ai-agent --set image.agent.tag=v0.2.0
+```
 

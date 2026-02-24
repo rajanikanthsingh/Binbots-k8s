@@ -6,8 +6,11 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     grafana_dashboard: "1"
+    {{- with .Values.grafanaDashboard.folder }}
+    grafana_dashboard_folder: {{ . | quote }}
+    {{- end }}
 data:
   binbots-k8s-dashboard.json: |
-{{ .Files.Get "deploy/grafana-dashboard-binbots.json" | indent 4 }}
+{{ .Files.Get "dashboards/grafana-dashboard-binbots.json" | indent 4 }}
 {{- end }}
 
