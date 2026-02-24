@@ -1,0 +1,25 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: k8s-ai-agent
+  namespace: monitoring
+spec:
+  schedule: "*/10 * * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ai-agent
+              image: your-registry/k8s-ai-agent:latest
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: PROMETHEUS_URL
+                  value: "http://prometheus-kube-prometheus-prometheus.monitoring.svc:9090"
+                - name: LOOKBACK_MINUTES
+                  value: "120"
+                - name: FORECAST_MINUTES
+                  value: "30"

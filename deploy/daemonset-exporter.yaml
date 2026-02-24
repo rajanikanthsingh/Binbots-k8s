@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: k8s-ai-exporter
+  namespace: monitoring
+  labels:
+    app: k8s-ai-exporter
+spec:
+  selector:
+    matchLabels:
+      app: k8s-ai-exporter
+  template:
+    metadata:
+      labels:
+        app: k8s-ai-exporter
+    spec:
+      serviceAccountName: k8s-ai-exporter
+      automountServiceAccountToken: true
+      tolerations:
+        - operator: "Exists"
+      containers:
+        - name: exporter
+          image: your-registry/k8s-ai-exporter:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - --listen-address=:9100
+            - --scrape-interval=30s
+            - --enable-kubelet=true
+            - --enable-cadvisor=true
+            - --exclude-phases=Succeeded,Failed
+          ports:
+            - name: http
+              containerPort: 9100
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

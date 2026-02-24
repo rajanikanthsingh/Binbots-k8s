@@ -1,0 +1,15 @@
+# Go
+go/go.sum
+go/exporter
+*.exe
+
+# Python
+python/__pycache__/
+python/.venv/
+*.pyc
+.pytest_cache/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
