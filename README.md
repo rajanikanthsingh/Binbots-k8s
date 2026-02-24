@@ -236,3 +236,102 @@ helm upgrade --install binbots-k8s . -f values.yaml -f values-dev.yaml --set ima
 helm upgrade --install binbots-k8s . -f values.yaml -f values-prod.yaml --set image.exporter.repository=myreg/k8s-ai-exporter --set image.exporter.tag=v0.2.0 --set image.agent.repository=myreg/k8s-ai-agent --set image.agent.tag=v0.2.0
 ```
 
+## Local Mac playground (kind / minikube)
+
+Use this section to quickly spin everything up locally and “play around” without pushing images to a registry.
+
+### A) Create a local cluster
+
+- **kind (recommended)**
+
+```bash
+brew install kind kubectl
+kind create cluster --name binbots
+kubectl cluster-info
+```
+
+- **minikube (alternative)**
+
+```bash
+brew install minikube kubectl
+minikube start
+kubectl cluster-info
+```
+
+### B) Install Prometheus + Grafana (kube-prometheus-stack)
+
+```bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm install prometheus-stack prometheus-community/kube-prometheus-stack -n monitoring --create-namespace
+```
+
+### C) Build images locally and load them into the cluster
+
+- **kind**
+
+```bash
+docker build -t k8s-ai-exporter:dev ./go
+kind load docker-image k8s-ai-exporter:dev --name binbots
+
+docker build -t k8s-ai-agent:dev ./python
+kind load docker-image k8s-ai-agent:dev --name binbots
+```
+
+- **minikube**
+
+```bash
+eval "$(minikube docker-env)"
+docker build -t k8s-ai-exporter:dev ./go
+docker build -t k8s-ai-agent:dev ./python
+```
+
+### D) Deploy Binbots-k8s (choose one)
+
+- **Option 1: raw YAML (quickest)**
+
+Update the image fields first:
+
+- `deploy/daemonset-exporter.yaml` → `image: k8s-ai-exporter:dev`
+- `deploy/cronjob-ai-agent.yaml` → `image: k8s-ai-agent:dev`
+
+Then apply:
+
+```bash
+kubectl apply -f deploy/
+```
+
+- **Option 2: Helm (more configurable)**
+
+```bash
+cd helm
+helm upgrade --install binbots-k8s . -f values.yaml \
+  --set image.exporter.repository=k8s-ai-exporter --set image.exporter.tag=dev \
+  --set image.agent.repository=k8s-ai-agent --set image.agent.tag=dev
+```
+
+### E) Verify
+
+- **Exporter metrics**
+
+```bash
+kubectl get pods -n monitoring -l app=k8s-ai-exporter
+kubectl port-forward -n monitoring svc/k8s-ai-exporter 9100:9100
+curl http://localhost:9100/metrics
+```
+
+- **Prometheus query UI**
+
+```bash
+kubectl port-forward -n monitoring svc/prometheus-stack-kube-prometheus-prometheus 9090:9090
+```
+
+Then query for `k8s_node_cpu_usage_cores`.
+
+- **Run the AI agent once**
+
+```bash
+kubectl create job -n monitoring ai-agent-manual --from=cronjob/k8s-ai-agent
+kubectl logs -n monitoring job/ai-agent-manual -f
+```
+
